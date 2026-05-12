@@ -1,0 +1,186 @@
+/* DeepSearch Assistant — Dark Theme */
+
+QMainWindow, QWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    font-family: "Segoe UI", "Inter", sans-serif;
+    font-size: 13px;
+}
+
+QSplitter::handle {
+    background-color: #313244;
+    width: 1px;
+}
+
+/* ---- Toolbar ---- */
+QToolBar {
+    background-color: #181825;
+    border-bottom: 1px solid #313244;
+    padding: 4px;
+    spacing: 4px;
+}
+
+QToolButton {
+    color: #cdd6f4;
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+QToolButton:hover {
+    background-color: #313244;
+}
+
+/* ---- Status bar ---- */
+QStatusBar {
+    background-color: #181825;
+    color: #a6adc8;
+    border-top: 1px solid #313244;
+    font-size: 11px;
+}
+
+/* ---- File browser ---- */
+#panelTitle {
+    font-weight: bold;
+    color: #89b4fa;
+    padding: 4px 0;
+}
+
+QListWidget#fileList {
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 4px;
+    padding: 4px;
+}
+QListWidget#fileList::item {
+    padding: 4px 6px;
+    border-radius: 3px;
+}
+QListWidget#fileList::item:selected {
+    background-color: #45475a;
+    color: #cdd6f4;
+}
+QListWidget#fileList::item:hover {
+    background-color: #313244;
+}
+
+QPushButton#addFilesButton {
+    background-color: #313244;
+    color: #89b4fa;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+QPushButton#addFilesButton:hover {
+    background-color: #45475a;
+}
+
+/* ---- Chat bubbles ---- */
+QFrame#userBubble {
+    background-color: #313244;
+    border-radius: 12px;
+    max-width: 500px;
+}
+
+QFrame#assistantBubble {
+    background-color: #1e1e2e;
+    border: 1px solid #313244;
+    border-radius: 12px;
+    max-width: 680px;
+}
+
+QFrame#errorBubble {
+    background-color: #45172a;
+    border: 1px solid #f38ba8;
+    border-radius: 8px;
+}
+
+QLabel#statusLabel {
+    color: #6c7086;
+    font-style: italic;
+    padding: 2px;
+}
+
+/* Scroll area transparent background */
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
+
+/* ---- Search bar ---- */
+QTextEdit#searchInput {
+    background-color: #181825;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+}
+QTextEdit#searchInput:focus {
+    border-color: #89b4fa;
+}
+
+QComboBox#modeCombo {
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+QComboBox#modeCombo::drop-down {
+    border: none;
+}
+QComboBox QAbstractItemView {
+    background-color: #313244;
+    color: #cdd6f4;
+    selection-background-color: #45475a;
+}
+
+QPushButton#sendButton {
+    background-color: #89b4fa;
+    color: #1e1e2e;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: bold;
+}
+QPushButton#sendButton:hover {
+    background-color: #b4befe;
+}
+QPushButton#sendButton:disabled {
+    background-color: #45475a;
+    color: #6c7086;
+}
+
+/* ---- Progress bar ---- */
+QProgressBar {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 3px;
+    height: 12px;
+}
+QProgressBar::chunk {
+    background-color: #89b4fa;
+    border-radius: 3px;
+}
+
+/* ---- Scrollbars ---- */
+QScrollBar:vertical {
+    background: #181825;
+    width: 8px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical {
+    background: #45475a;
+    border-radius: 4px;
+    min-height: 20px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #585b70;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0;
+}

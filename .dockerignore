@@ -1,0 +1,38 @@
+# Models (large binary files — mount at runtime)
+models/
+*.gguf
+
+# Data (user data — mount at runtime)
+data/
+*.db
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Venv
+.venv/
+venv/
+env/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Docs (not needed in image)
+docs/
+
+# OpenVINO cache
+.ov_cache/
+.npu_cache/

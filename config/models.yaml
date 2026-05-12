@@ -1,0 +1,73 @@
+# DeepSearch Assistant — Model Registry
+# All models are downloaded via scripts/download_models.py
+
+models:
+  llm_main:
+    name: "Qwen2.5-7B-Instruct"
+    repo: "Qwen/Qwen2.5-7B-Instruct-GGUF"
+    filename: "qwen2.5-7b-instruct-q4_k_m.gguf"
+    size_gb: 4.4
+    purpose: "generation"
+    backend: "llamacpp"
+    context_length: 32768
+    stage: 1
+
+  llm_small:
+    name: "Phi-3.5-mini-instruct"
+    repo: "bartowski/Phi-3.5-mini-instruct-GGUF"
+    filename: "Phi-3.5-mini-instruct-Q4_K_M.gguf"
+    size_gb: 2.2
+    purpose: "query_rewrite, routing, draft"
+    backend: "llamacpp"
+    context_length: 131072
+    stage: 2
+
+  llm_fallback:
+    name: "Qwen2.5-3B-Instruct"
+    repo: "Qwen/Qwen2.5-3B-Instruct-GGUF"
+    filename: "qwen2.5-3b-instruct-q4_k_m.gguf"
+    size_gb: 1.8
+    purpose: "fallback_generation"
+    backend: "llamacpp"
+    context_length: 32768
+    stage: 1
+
+  embedding:
+    name: "all-MiniLM-L6-v2"
+    repo: "sentence-transformers/all-MiniLM-L6-v2"
+    size_gb: 0.09
+    purpose: "embedding"
+    backend: "sentence_transformers"
+    dimensions: 384
+    stage: 1
+
+  reranker:
+    name: "ms-marco-MiniLM-L-6-v2"
+    repo: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    size_gb: 0.09
+    purpose: "reranking"
+    backend: "sentence_transformers"
+    stage: 2
+
+  vlm:
+    name: "LLaVA-v1.6-mistral-7B"
+    repo: "cjpais/llava-v1.6-mistral-7b-gguf"
+    filename: "llava-v1.6-mistral-7b-Q4_K_M.gguf"
+    size_gb: 4.1
+    purpose: "image_captioning"
+    backend: "llamacpp"
+    stage: 3
+
+  whisper:
+    name: "faster-whisper-medium"
+    repo: "Systran/faster-whisper-medium"
+    size_gb: 1.5
+    purpose: "audio_transcription"
+    backend: "faster_whisper"
+    stage: 3
+
+# Fallback chain — tried in order if primary model fails validation
+fallback_chain:
+  - "llm_main"       # Qwen2.5-7B Q4_K_M
+  - "llm_small"      # Phi-3.5-mini Q4_K_M
+  - "llm_fallback"   # Qwen2.5-3B Q4_K_M

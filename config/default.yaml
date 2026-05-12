@@ -1,0 +1,66 @@
+# DeepSearch Assistant — Default Configuration
+
+app:
+  name: "DeepSearch Assistant"
+  version: "0.1.0"
+  data_dir: "./data"
+  models_dir: "./models"
+  log_level: "INFO"
+
+models:
+  llm_device: "auto"          # auto, cpu, cuda, openvino
+  n_gpu_layers: -1             # -1 = all layers on GPU if available, 0 = CPU only
+  context_length: 4096         # LLM context window size
+  max_tokens: 1024             # Max generation tokens
+  temperature: 0.1             # Low for factual RAG answers
+  top_p: 0.9
+
+retrieval:
+  top_k_retrieval: 50          # Candidates from hybrid search
+  top_k_rerank: 5              # Final chunks after reranking
+  rrf_k: 60                    # RRF fusion constant
+  embedding_batch_size: 64     # Batch size for embedding
+
+indexing:
+  watch_folders: []            # Auto-index these folders
+  chunk_size: 512              # Tokens per chunk (Stage 1)
+  chunk_overlap: 50            # Overlap between chunks
+  supported_extensions:
+    - ".pdf"
+    - ".docx"
+    - ".txt"
+    - ".md"
+    - ".pptx"
+    - ".xlsx"
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".mp4"
+    - ".avi"
+    - ".wav"
+    - ".mp3"
+
+cloud:
+  enabled: false
+  provider: "openai"           # openai, anthropic
+  api_key: ""                  # Override via env: DEEPSEARCH_CLOUD_API_KEY
+  model: "gpt-4o-mini"
+  confidence_threshold: 0.65   # Below this, escalate to cloud
+
+ui:
+  theme: "dark"                # dark, light
+  font_size: 13
+  show_citations: true
+  streaming: true
+
+cache:
+  embedding_cache_size: 10000  # LRU entries
+  query_cache_size: 500        # LRU entries
+  query_cache_ttl: 600         # seconds (10 min)
+  answer_cache_size: 200       # LRU entries
+  answer_cache_ttl: 1800       # seconds (30 min)
+
+resource:
+  max_ram_gb: 12.0             # Max RAM budget for models
+  enable_battery_routing: true # Downgrade models on battery
+  battery_threshold: 30        # Below this %, use minimal config

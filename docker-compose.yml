@@ -1,0 +1,62 @@
+version: "3.9"
+
+# ============================================================
+# Services
+# ============================================================
+# test   — runs pytest unit tests (headless, no GPU, no models)
+# app    — full desktop app (requires X11 on host)
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Unit test runner (CI-friendly, no GPU, no model download)
+  # ----------------------------------------------------------
+  test:
+    build:
+      context: .
+      target: test
+    image: deepsearch-test:latest
+    container_name: deepsearch_test
+    environment:
+      - QT_QPA_PLATFORM=offscreen
+      - PYTHONPATH=/app/src
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    # Override CMD to add colour / coverage if desired:
+    command: >
+      pytest tests/unit/
+        -v
+        --tb=short
+        --no-header
+        -q
+    volumes:
+      # Mount tests live so you can edit & re-run without rebuild
+      - ./tests:/app/tests:ro
+
+  # ----------------------------------------------------------
+  # Full desktop app (Linux host with X11)
+  # Usage:
+  #   xhost +local:docker
+  #   docker compose up app
+  # ----------------------------------------------------------
+  app:
+    build:
+      context: .
+      target: app
+    image: deepsearch-app:latest
+    container_name: deepsearch_app
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - QT_X11_NO_MITSHM=1
+      - PYTHONPATH=/app/src
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    network_mode: host
+    stdin_open: true
+    tty: true
+    profiles:
+      - gui   # only starts with: docker compose --profile gui up app

@@ -1,0 +1,60 @@
+# Models (large GGUF files)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.pt
+!models/.gitkeep
+
+# Data (vector store + database)
+data/qdrant/
+data/*.db
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+*.key
+
+# Logs
+*.log
+logs/
+
+# OpenVINO cache
+.ov_cache/
+.npu_cache/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# MyPy
+.mypy_cache/
+
+docs/
