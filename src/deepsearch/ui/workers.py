@@ -52,6 +52,7 @@ class QueryWorker(QThread):
                 result = SearchResult(
                     answer=full_answer,
                     search_mode=self._mode,
+                    sources=getattr(self._pipeline, "_last_sources", []) or [],
                 )
                 self.result_ready.emit(result)
             else:

@@ -74,13 +74,16 @@ class IngestionDispatcher:
         if not path.exists():
             raise IndexingError(f"File not found: {path}")
 
-        # Skip if already indexed and unchanged
-        if self._skip_existing and self._db.is_indexed(path):
-            existing = self._db.get_file(path)
-            log.debug("Skipping already-indexed file: %s", path.name)
-            return existing["file_id"] if existing else ""
-
-        file_id = str(uuid.uuid4())
+        existing = self._db.get_file(path)
+        if existing:
+            if self._skip_existing and self._db.is_indexed(path):
+                log.debug("Skipping already-indexed file: %s", path.name)
+                return existing["file_id"]
+            # File changed or forced re-index: delete old chunks and reuse file_id
+            self._vs.delete_by_file_id(existing["file_id"])
+            file_id = existing["file_id"]
+        else:
+            file_id = str(uuid.uuid4())
         parser = self._find_parser(path)
         if parser is None:
             raise IndexingError(f"No parser for extension: {path.suffix}")

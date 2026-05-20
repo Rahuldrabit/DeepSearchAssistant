@@ -87,6 +87,12 @@ class CloudAPIBackend(LLMBackend):
     def unload(self) -> None:
         if self._client:
             self._client.close()
+        if hasattr(self, '_async_client') and self._async_client:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._async_client.aclose())
+            except RuntimeError:
+                asyncio.run(self._async_client.aclose())
         self._info.loaded = False
 
     # ------------------------------------------------------------------ #
@@ -114,8 +120,15 @@ class CloudAPIBackend(LLMBackend):
             "messages": [{"role": "user", "content": clean}],
         }
         resp = self._client.post("/v1/messages", json=payload)
+        if not resp.is_success:
+            data = resp.json()
+            if "error" in data:
+                raise RuntimeError(f"API error: {data['error']}")
         resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+        data = resp.json()
+        if "error" in data:
+            raise RuntimeError(f"API error: {data['error']}")
+        return data["content"][0]["text"]
 
     def stream(self, prompt: str, config: GenerationConfig) -> Iterator[str]:
         self._require_loaded()
@@ -152,8 +165,15 @@ class CloudAPIBackend(LLMBackend):
             "messages": [{"role": "user", "content": clean}],
         }
         resp = await self._async_client.post("/v1/messages", json=payload)
+        if not resp.is_success:
+            data = resp.json()
+            if "error" in data:
+                raise RuntimeError(f"API error: {data['error']}")
         resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+        data = resp.json()
+        if "error" in data:
+            raise RuntimeError(f"API error: {data['error']}")
+        return data["content"][0]["text"]
 
     async def astream(
         self, prompt: str, config: GenerationConfig

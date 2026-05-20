@@ -42,13 +42,12 @@ class ResourceManager:
 
     def acquire_slot_a(self, model_id: str, unload_fn: Callable[[], None]) -> None:
         """Swap into Slot A, evicting whatever was there before."""
+        cb_to_call = None
         with self._slot_mutex:
             current = self._loaded[Slot.A]
             if current and current != model_id:
                 log.info("Evicting %s from Slot A to make room for %s", current, model_id)
-                cb = self._unload_callbacks.pop(Slot.A, None)
-                if cb:
-                    cb()
+                cb_to_call = self._unload_callbacks.pop(Slot.A, None)
                 self._loaded[Slot.A] = None
                 self._slot_a_owner = None
 
@@ -58,16 +57,20 @@ class ResourceManager:
                 self._unload_callbacks[Slot.A] = unload_fn
                 log.info("Slot A acquired by %s", model_id)
             # else: already loaded (same model_id), no-op
+        
+        if cb_to_call:
+            cb_to_call()
 
     def release_slot_a(self, model_id: str) -> None:
+        cb_to_call = None
         with self._slot_mutex:
             if self._loaded[Slot.A] == model_id:
-                cb = self._unload_callbacks.pop(Slot.A, None)
-                if cb:
-                    cb()
+                cb_to_call = self._unload_callbacks.pop(Slot.A, None)
                 self._loaded[Slot.A] = None
                 self._slot_a_owner = None
                 log.info("Slot A released by %s", model_id)
+        if cb_to_call:
+            cb_to_call()
 
     @property
     def slot_a_owner(self) -> str | None:

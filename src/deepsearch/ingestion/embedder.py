@@ -13,6 +13,7 @@ import logging
 import math
 import re
 from collections import Counter
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -95,10 +96,13 @@ class Embedder:
         embedding_backend: EmbeddingBackend,
         cache: EmbeddingCache | None = None,
         batch_size: int = 64,
+        data_dir: Path | None = None,
     ) -> None:
         self._backend = embedding_backend
         self._cache = cache
         self._batch_size = batch_size
+        self._data_dir = data_dir
+        self._stats_path = data_dir / "bm25_stats.json" if data_dir else None
 
         # BM25 corpus statistics (updated as documents are indexed)
         self._vocab: dict[str, int] = {}       # token → vocab index
@@ -106,6 +110,39 @@ class Embedder:
         self._doc_count: int = 0               # total documents seen
         self._total_tokens: int = 0            # sum of all document lengths
         self._next_vocab_id: int = 0
+        self._load_stats()
+
+    def _load_stats(self) -> None:
+        if not self._stats_path or not self._stats_path.exists():
+            return
+        try:
+            import json
+            with open(self._stats_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._vocab = data.get("vocab", {})
+            self._doc_freqs = data.get("doc_freqs", {})
+            self._doc_count = data.get("doc_count", 0)
+            self._total_tokens = data.get("total_tokens", 0)
+            self._next_vocab_id = data.get("next_vocab_id", 0)
+        except Exception as exc:
+            log.warning("Failed to load BM25 stats: %s", exc)
+
+    def _save_stats(self) -> None:
+        if not self._stats_path:
+            return
+        try:
+            import json
+            data = {
+                "vocab": self._vocab,
+                "doc_freqs": self._doc_freqs,
+                "doc_count": self._doc_count,
+                "total_tokens": self._total_tokens,
+                "next_vocab_id": self._next_vocab_id,
+            }
+            with open(self._stats_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except Exception as exc:
+            log.warning("Failed to save BM25 stats: %s", exc)
 
     # ------------------------------------------------------------------ #
     # Vocabulary & statistics management                                   #
@@ -180,6 +217,7 @@ class Embedder:
                 "sparse_values": sparse_v,
                 "payload": payload,
             })
+        self._save_stats()
         return results
 
     def embed_query(self, query: str) -> tuple[list[float], list[int], list[float]]:

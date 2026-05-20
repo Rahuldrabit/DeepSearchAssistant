@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -50,6 +51,8 @@ class MetadataDB:
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_DDL)
         self._conn.commit()
+        self._lock = threading.Lock()
+        self._hash_cache: dict[tuple[Path, float, int], str] = {}
         log.info("Metadata DB opened: %s", self._path)
 
     # ------------------------------------------------------------------ #
@@ -57,17 +60,28 @@ class MetadataDB:
     # ------------------------------------------------------------------ #
 
     def file_hash(self, path: Path) -> str:
+        stat = path.stat()
+        key = (path, stat.st_mtime, stat.st_size)
+        with self._lock:
+            if key in self._hash_cache:
+                return self._hash_cache[key]
         h = hashlib.sha256()
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)
-        return h.hexdigest()
+        res = h.hexdigest()
+        with self._lock:
+            if len(self._hash_cache) > 1000:
+                self._hash_cache.clear()
+            self._hash_cache[key] = res
+        return res
 
     def is_indexed(self, path: Path) -> bool:
         """Return True if file is already indexed and hasn't changed."""
-        row = self._conn.execute(
-            "SELECT hash, mtime FROM files WHERE path = ?", (str(path),)
-        ).fetchone()
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT hash, mtime FROM files WHERE path = ?", (str(path),)
+            ).fetchone()
         if row is None:
             return False
         stat = path.stat()
@@ -85,44 +99,50 @@ class MetadataDB:
     ) -> None:
         stat = path.stat()
         h = self.file_hash(path)
-        self._conn.execute(
-            """
-            INSERT INTO files (file_id, path, hash, size, mtime, indexed_at, chunk_count, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(path) DO UPDATE SET
-                hash=excluded.hash, size=excluded.size, mtime=excluded.mtime,
-                indexed_at=excluded.indexed_at, chunk_count=excluded.chunk_count,
-                status=excluded.status
-            """,
-            (file_id, str(path), h, stat.st_size, stat.st_mtime, time.time(), chunk_count, status),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO files (file_id, path, hash, size, mtime, indexed_at, chunk_count, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    hash=excluded.hash, size=excluded.size, mtime=excluded.mtime,
+                    indexed_at=excluded.indexed_at, chunk_count=excluded.chunk_count,
+                    status=excluded.status
+                """,
+                (file_id, str(path), h, stat.st_size, stat.st_mtime, time.time(), chunk_count, status),
+            )
+            self._conn.commit()
 
     def get_file(self, path: Path) -> Optional[dict[str, Any]]:
-        row = self._conn.execute(
-            "SELECT * FROM files WHERE path = ?", (str(path),)
-        ).fetchone()
-        return dict(row) if row else None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM files WHERE path = ?", (str(path),)
+            ).fetchone()
+            return dict(row) if row else None
 
     def get_file_by_id(self, file_id: str) -> Optional[dict[str, Any]]:
-        row = self._conn.execute(
-            "SELECT * FROM files WHERE file_id = ?", (file_id,)
-        ).fetchone()
-        return dict(row) if row else None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM files WHERE file_id = ?", (file_id,)
+            ).fetchone()
+            return dict(row) if row else None
 
     def delete_file(self, file_id: str) -> None:
-        self._conn.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DELETE FROM files WHERE file_id = ?", (file_id,))
+            self._conn.commit()
 
     def list_files(self) -> list[dict[str, Any]]:
-        rows = self._conn.execute(
-            "SELECT * FROM files ORDER BY indexed_at DESC"
-        ).fetchall()
-        return [dict(r) for r in rows]
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM files ORDER BY indexed_at DESC"
+            ).fetchall()
+            return [dict(r) for r in rows]
 
     @property
     def file_count(self) -> int:
-        return self._conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM files").fetchone()[0]
 
     # ------------------------------------------------------------------ #
     # Feedback                                                             #
@@ -135,17 +155,20 @@ class MetadataDB:
         rating: int,
         comment: str = "",
     ) -> None:
-        self._conn.execute(
-            "INSERT INTO feedback (query, answer, rating, comment, created_at) VALUES (?,?,?,?,?)",
-            (query, answer, rating, comment, time.time()),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO feedback (query, answer, rating, comment, created_at) VALUES (?,?,?,?,?)",
+                (query, answer, rating, comment, time.time()),
+            )
+            self._conn.commit()
 
     def get_feedback(self, limit: int = 100) -> list[dict[str, Any]]:
-        rows = self._conn.execute(
-            "SELECT * FROM feedback ORDER BY created_at DESC LIMIT ?", (limit,)
-        ).fetchall()
-        return [dict(r) for r in rows]
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM feedback ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+            return [dict(r) for r in rows]
 
     def close(self) -> None:
-        self._conn.close()
+        with self._lock:
+            self._conn.close()

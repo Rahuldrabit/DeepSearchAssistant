@@ -107,28 +107,31 @@ class OpenVINOBackend(LLMBackend):
         yield from tokens
 
     async def agenerate(self, prompt: str, config: GenerationConfig) -> str:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self.generate, prompt, config)
 
     async def astream(
         self, prompt: str, config: GenerationConfig
     ) -> AsyncIterator[str]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         queue: asyncio.Queue[str | None] = asyncio.Queue()
 
         def _produce() -> None:
             try:
                 for token in self.stream(prompt, config):
                     asyncio.run_coroutine_threadsafe(queue.put(token), loop)
+            except Exception as e:
+                log.error("Error in stream production: %s", e)
             finally:
                 asyncio.run_coroutine_threadsafe(queue.put(None), loop)
 
-        loop.run_in_executor(None, _produce)
+        fut = asyncio.ensure_future(loop.run_in_executor(None, _produce))
         while True:
             token = await queue.get()
             if token is None:
                 break
             yield token
+        await fut
 
     @property
     def info(self) -> BackendInfo:

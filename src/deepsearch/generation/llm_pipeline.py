@@ -179,9 +179,10 @@ class LLMPipeline:
         top_k = decision.top_k
 
         hits = self._retrieve_cached(question, mode, top_k, file_filter)
-        context, _ = self._ctx_builder.build(
+        context, selected = self._ctx_builder.build(
             question, hits, expand_parents=(mode != "fast")
         )
+        self._last_sources = selected
         yield from self._stream_tokens(question, context, mode)
 
     # ------------------------------------------------------------------ #

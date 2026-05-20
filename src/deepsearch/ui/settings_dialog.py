@@ -9,6 +9,7 @@ Sections:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -212,17 +213,19 @@ class SettingsDialog(QDialog):
 
     def _populate(self) -> None:
         # Models
-        self._ram_slider.setValue(
-            getattr(self._cfg.resources, "ram_budget_gb", 8)
-        )
+        ram_gb = int(round(getattr(self._cfg.resource, "max_memory_gb", 8.0)))
+        ram_gb = max(self._ram_slider.minimum(), min(self._ram_slider.maximum(), ram_gb))
+        self._ram_slider.setValue(ram_gb)
+        self._ram_label.setText(f"{ram_gb} GB")
 
         # Cloud
         self._cloud_enabled.setChecked(self._cfg.cloud.enabled)
-        self._cloud_api_key.setText(getattr(self._cfg, "cloud_api_key", "") or "")
+        self._cloud_api_key.setText(self._cfg.cloud_api_key or "")
         self._cloud_threshold.setValue(self._cfg.cloud.confidence_threshold)
         self._cloud_model.setText(self._cfg.cloud.model or "")
 
         # Appearance
+        self._dark_theme.setChecked(self._cfg.ui.theme == "dark")
         self._streaming.setChecked(getattr(self._cfg.ui, "streaming", True))
 
     # ------------------------------------------------------------------ #
@@ -266,28 +269,32 @@ class SettingsDialog(QDialog):
     # ------------------------------------------------------------------ #
 
     def _on_accept(self) -> None:
-        # Apply cloud settings (mutable attrs)
-        self._cfg.cloud.enabled = self._cloud_enabled.isChecked()
-        self._cfg.cloud.confidence_threshold = self._cloud_threshold.value()
+        cloud_update: dict = {
+            "enabled": self._cloud_enabled.isChecked(),
+            "confidence_threshold": self._cloud_threshold.value(),
+        }
         if self._cloud_model.text().strip():
-            self._cfg.cloud.model = self._cloud_model.text().strip()
+            cloud_update["model"] = self._cloud_model.text().strip()
+        cloud = self._cfg.cloud.model_copy(update=cloud_update)
 
-        # API key — stored on Settings directly (not persisted to disk)
+        resource = self._cfg.resource.model_copy(
+            update={"max_memory_gb": float(self._ram_slider.value())}
+        )
+
+        ui = self._cfg.ui.model_copy(
+            update={
+                "streaming": self._streaming.isChecked(),
+                "theme": "dark" if self._dark_theme.isChecked() else "light",
+            }
+        )
+
+        updated = self._cfg.model_copy(update={"cloud": cloud, "resource": resource, "ui": ui})
+
         api_key = self._cloud_api_key.text().strip()
         if api_key:
-            object.__setattr__(self._cfg, "cloud_api_key", api_key)
+            os.environ[updated.cloud.api_key_env] = api_key
 
-        # RAM budget
-        if hasattr(self._cfg, "resources"):
-            object.__setattr__(
-                self._cfg.resources, "ram_budget_gb", self._ram_slider.value()
-            )
-
-        # Streaming
-        if hasattr(self._cfg, "ui"):
-            object.__setattr__(self._cfg.ui, "streaming", self._streaming.isChecked())
-
-        self.settings_saved.emit(self._cfg)
+        self.settings_saved.emit(updated)
         self.accept()
 
     # ------------------------------------------------------------------ #

@@ -45,11 +45,11 @@ class MessageBubble(QFrame):
         self._feedback_row: QHBoxLayout | None = None
         if role == "assistant":
             self._feedback_row = QHBoxLayout()
-            self._thumbs_up = QPushButton("👍")
+            self._thumbs_up = QPushButton("👍", self)
             self._thumbs_up.setFixedSize(28, 28)
             self._thumbs_up.setToolTip("Good answer")
             self._thumbs_up.clicked.connect(lambda: self._on_feedback(1))
-            self._thumbs_down = QPushButton("👎")
+            self._thumbs_down = QPushButton("👎", self)
             self._thumbs_down.setFixedSize(28, 28)
             self._thumbs_down.setToolTip("Bad answer")
             self._thumbs_down.clicked.connect(lambda: self._on_feedback(-1))
@@ -72,8 +72,12 @@ class MessageBubble(QFrame):
     def show_feedback_buttons(self) -> None:
         """Make feedback buttons visible (call once streaming is done)."""
         if self._role == "assistant":
+            # Use show() in addition to setVisible() to ensure Qt
+            # updates visibility immediately under test harnesses.
             self._thumbs_up.setVisible(True)
             self._thumbs_down.setVisible(True)
+            self._thumbs_up.show()
+            self._thumbs_down.show()
 
     def _on_feedback(self, rating: int) -> None:
         self.feedback_given.emit(rating, self._label.text())
@@ -154,10 +158,15 @@ class ChatWidget(QWidget):
     def finish_assistant_message(self, full_text: str | None = None) -> None:
         """Finalise the current assistant message and show feedback buttons."""
         if self._current_assistant_bubble:
-            if full_text:
-                self._current_assistant_bubble.text = full_text
-            self._current_assistant_bubble.show_feedback_buttons()
-            self._current_assistant_bubble.feedback_given.connect(self.feedback_given)
+            bubble = self._current_assistant_bubble
+            if full_text is not None:
+                bubble.text = full_text
+            # Ensure the widget hierarchy is shown so QWidget.isVisible()
+            # reflects the updated state immediately in tests.
+            self.show()
+            bubble.show()
+            bubble.show_feedback_buttons()
+            bubble.feedback_given.connect(self.feedback_given)
         self._current_assistant_bubble = None
 
     def add_error_message(self, error: str) -> None:

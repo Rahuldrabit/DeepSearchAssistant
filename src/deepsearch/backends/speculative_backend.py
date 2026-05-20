@@ -155,10 +155,8 @@ class SpeculativeBackend(LLMBackend):
         return self.generate(prompt, config)
 
     async def astream(self, prompt: str, config: GenerationConfig) -> AsyncIterator[str]:
-        async def _gen():
-            for tok in self.stream(prompt, config):
-                yield tok
-        return _gen()
+        for tok in self.stream(prompt, config):
+            yield tok
 
     def build_prompt(self, system: str, user: str, context: str = "") -> str:
         return self._main.build_prompt(system, user, context)
@@ -192,8 +190,8 @@ class SpeculativeBackend(LLMBackend):
                     isinstance(self._draft, LlamaCppBackend)):
                 return None
 
-            main_llm = self._main._llm  # type: ignore[attr-defined]
-            draft_llm = self._draft._llm  # type: ignore[attr-defined]
+            main_llm = self._main._model  # type: ignore[attr-defined]
+            draft_llm = self._draft._model  # type: ignore[attr-defined]
             if main_llm is None or draft_llm is None:
                 return None
 

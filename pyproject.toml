@@ -36,6 +36,9 @@ dependencies = [
     "huggingface-hub>=0.23",
     "rich>=13.0",
 
+    # Auto-indexing
+    "watchdog>=4.0",
+
     # Image
     "Pillow>=10.0",
 ]

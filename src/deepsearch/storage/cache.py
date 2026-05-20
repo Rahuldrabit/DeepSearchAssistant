@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 import time
 from collections import OrderedDict
 from typing import Generic, Optional, TypeVar
@@ -16,34 +17,40 @@ class TTLCache(Generic[V]):
         self._max = max_size
         self._ttl = ttl_seconds
         self._store: OrderedDict[str, tuple[V, float]] = OrderedDict()
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Optional[V]:
-        entry = self._store.get(key)
-        if entry is None:
-            return None
-        value, ts = entry
-        if time.time() - ts > self._ttl:
-            del self._store[key]
-            return None
-        # Move to end (most recently used)
-        self._store.move_to_end(key)
-        return value
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            value, ts = entry
+            if time.time() - ts > self._ttl:
+                del self._store[key]
+                return None
+            # Move to end (most recently used)
+            self._store.move_to_end(key)
+            return value
 
     def set(self, key: str, value: V) -> None:
-        if key in self._store:
-            self._store.move_to_end(key)
-        self._store[key] = (value, time.time())
-        if len(self._store) > self._max:
-            self._store.popitem(last=False)  # evict LRU
+        with self._lock:
+            if key in self._store:
+                self._store.move_to_end(key)
+            self._store[key] = (value, time.time())
+            if len(self._store) > self._max:
+                self._store.popitem(last=False)  # evict LRU
 
     def invalidate(self, key: str) -> None:
-        self._store.pop(key, None)
+        with self._lock:
+            self._store.pop(key, None)
 
     def clear(self) -> None:
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
 
     def __len__(self) -> int:
-        return len(self._store)
+        with self._lock:
+            return len(self._store)
 
 
 def _text_key(text: str) -> str:

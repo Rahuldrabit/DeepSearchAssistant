@@ -103,7 +103,8 @@ class Settings(BaseModel):
 
     @property
     def data_path(self) -> Path:
-        return Path(self.app.data_dir)
+        p = Path(self.app.data_dir)
+        return p if p.is_absolute() else (_REPO_ROOT / p)
 
     @property
     def qdrant_path(self) -> Path:

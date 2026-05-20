@@ -74,7 +74,12 @@ class ContextBuilder:
     def _rerank(self, query: str, hits: list[dict]) -> list[dict]:
         passages = [h.get("payload", {}).get("text", "") for h in hits]
         ranked = self._reranker.rerank(query, passages, top_k=self._top_k_rerank)
-        return [hits[idx] for idx, _ in ranked]
+        reranked: list[dict] = []
+        for idx, score in ranked:
+            h = dict(hits[idx])
+            h["score"] = float(score)
+            reranked.append(h)
+        return reranked
 
     def _expand_parents(self, hits: list[dict]) -> list[dict]:
         """Replace level-1 chunks with their level-0 parents where available."""

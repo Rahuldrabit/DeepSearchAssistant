@@ -185,6 +185,7 @@ class _ChangeHandler(_Base):
     def on_moved(self, event) -> None:
         if not event.is_directory:
             # Old path → remove, new path → index
+            self._cb(event.src_path)
             self._cb(event.dest_path)
 
     def on_deleted(self, event) -> None:

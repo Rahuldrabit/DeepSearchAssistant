@@ -55,7 +55,7 @@ def build_pipeline():
     reranker_backend.load("cross-encoder/ms-marco-MiniLM-L-6-v2", device="cpu")
 
     # Ingestion
-    embedder = Embedder(embedding_backend, cache=cache.embeddings)
+    embedder = Embedder(embedding_backend, cache=cache.embeddings, data_dir=cfg.data_path)
     chunker = HierarchicalChunker(
         chunk_size_chars=cfg.indexing.chunk_size * 4,
         overlap_chars=cfg.indexing.chunk_overlap * 4,
@@ -107,6 +107,8 @@ def main() -> None:
     app.setApplicationVersion(cfg.app.version)
 
     pipeline, dispatcher, metadata_db, model_manager, settings = build_pipeline()
+
+    app.aboutToQuit.connect(metadata_db.close)
 
     window = MainWindow(
         pipeline=pipeline,

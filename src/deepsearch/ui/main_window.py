@@ -53,10 +53,11 @@ class MainWindow(QMainWindow):
         self._db = metadata_db
         self._mm = model_manager
         self._cfg = settings
-        self._dark_mode = True
+        self._dark_mode = (settings.ui.theme == "dark")
 
         self._active_query_worker: Optional[QueryWorker] = None
         self._active_index_worker: Optional[IndexWorker] = None
+        self._model_load_worker: Optional[ModelLoadWorker] = None
         self._last_query: str = ""
         self._last_answer: str = ""
 
@@ -235,6 +236,7 @@ class MainWindow(QMainWindow):
 
     def _on_settings_saved(self, settings: Settings) -> None:
         self._cfg = settings
+        self._dark_mode = (settings.ui.theme == "dark")
         log.info("Settings updated")
         self._load_stylesheet()
 
@@ -245,21 +247,23 @@ class MainWindow(QMainWindow):
     def _start_model_load(self) -> None:
         """Load models asynchronously at startup."""
         self._search_bar.set_enabled(False)
-        worker = ModelLoadWorker(self._mm)
-        worker.progress.connect(self._status_label.setText)
-        worker.loaded.connect(self._on_model_loaded)
-        worker.error.connect(self._on_model_load_error)
-        worker.start()
+        self._model_load_worker = ModelLoadWorker(self._mm)
+        self._model_load_worker.progress.connect(self._status_label.setText)
+        self._model_load_worker.loaded.connect(self._on_model_loaded)
+        self._model_load_worker.error.connect(self._on_model_load_error)
+        self._model_load_worker.start()
 
     def _on_model_loaded(self) -> None:
         self._status_label.setText("Ready")
         self._search_bar.set_enabled(True)
         self._chat.add_status_message("Models loaded. Ask a question to get started.")
+        self._model_load_worker = None
 
     def _on_model_load_error(self, error: str) -> None:
         self._status_label.setText(f"Model load error: {error}")
         self._chat.add_error_message(f"Failed to load model: {error}")
         self._search_bar.set_enabled(True)
+        self._model_load_worker = None
 
     # ------------------------------------------------------------------ #
     # Query handling                                                       #
@@ -356,7 +360,11 @@ class MainWindow(QMainWindow):
                 file_id = src.get("file_id")
                 if file_id:
                     try:
-                        self._pipeline._search._vector_store.boost_file(file_id)
+                        store = getattr(self._pipeline._search, "_vs", None) or getattr(
+                            self._pipeline._search, "_vector_store", None
+                        )
+                        if store is not None:
+                            store.boost_file(file_id)
                     except Exception as exc:
                         log.debug("score_boost failed for %s: %s", file_id, exc)
 
