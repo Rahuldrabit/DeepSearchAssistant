@@ -25,6 +25,7 @@ indexing:
   watch_folders: []            # Auto-index these folders
   chunk_size: 512              # Tokens per chunk (Stage 1)
   chunk_overlap: 50            # Overlap between chunks
+  max_concurrent_files: 4      # Index up to N files in parallel from the UI
   supported_extensions:
     - ".pdf"
     - ".docx"
@@ -46,6 +47,24 @@ cloud:
   api_key: ""                  # Override via env: DEEPSEARCH_CLOUD_API_KEY
   model: "gpt-4o-mini"
   confidence_threshold: 0.65   # Below this, escalate to cloud
+
+# ── Local Providers ───────────────────────────────────────────────────────────
+# Use Ollama or LM Studio instead of (or alongside) the built-in llama-cpp backend.
+# Only one provider is active at a time; set `active` to switch.
+local_providers:
+  active: ""                   # "" = disabled | "ollama" | "lmstudio"
+
+  ollama:
+    enabled: false
+    base_url: "http://localhost:11434"
+    model: "llama3.2:3b"       # Any model you've pulled: ollama pull <model>
+    timeout: 120               # HTTP timeout in seconds
+
+  lmstudio:
+    enabled: false
+    base_url: "http://localhost:1234"
+    model: ""                  # Must match the model ID shown in LM Studio's server tab
+    timeout: 120               # HTTP timeout in seconds
 
 ui:
   theme: "dark"                # dark, light

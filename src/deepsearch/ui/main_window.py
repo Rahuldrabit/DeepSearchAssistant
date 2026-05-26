@@ -321,7 +321,11 @@ class MainWindow(QMainWindow):
         self._progress.setVisible(True)
         self._progress.setRange(0, 0)  # indeterminate
 
-        worker = IndexWorker(self._dispatcher, paths)
+        worker = IndexWorker(
+            self._dispatcher,
+            paths,
+            max_workers=getattr(self._cfg.indexing, "max_concurrent_files", 1),
+        )
         worker.progress.connect(self._status_label.setText)
         worker.file_done.connect(lambda p, fid: None)
         worker.finished.connect(self._on_indexing_done)

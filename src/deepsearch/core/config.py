@@ -45,6 +45,9 @@ class IndexingConfig(BaseModel):
     chunk_size: int = 512
     chunk_overlap: int = 50
     batch_size: int = 32
+    # Max number of files to index concurrently when the user adds multiple
+    # files/folders from the UI. Higher values can increase CPU/RAM usage.
+    max_concurrent_files: int = 4
     supported_extensions: list[str] = Field(
         default_factory=lambda: [
             ".pdf", ".docx", ".txt", ".md", ".py", ".json",

@@ -127,7 +127,7 @@ class IngestionDispatcher:
     def ingest_directory(self, directory: Path, recursive: bool = True) -> list[str]:
         """Ingest all supported files in a directory."""
         pattern = "**/*" if recursive else "*"
-        supported = {ext for p in self._parsers for ext in p.supported_extensions}
+        supported = self.supported_extensions()
         files = [p for p in directory.glob(pattern) if p.suffix.lower() in supported and p.is_file()]
 
         log.info("Found %d files to index in %s", len(files), directory)
@@ -145,6 +145,10 @@ class IngestionDispatcher:
         if errors:
             log.warning("Failed to index %d files: %s", len(errors), errors[:5])
         return file_ids
+
+    def supported_extensions(self) -> set[str]:
+        """Return the set of supported file extensions (lowercase, includes dot)."""
+        return {ext.lower() for p in self._parsers for ext in p.supported_extensions}
 
     def delete(self, path: Path) -> None:
         """Remove a file and its chunks from the index."""

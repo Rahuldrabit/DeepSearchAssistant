@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import math
 import re
+import threading
 from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -104,6 +105,10 @@ class Embedder:
         self._data_dir = data_dir
         self._stats_path = data_dir / "bm25_stats.json" if data_dir else None
 
+        # Protects shared BM25 statistics/vocabulary across threads.
+        # (UI query thread + indexing worker threads can run concurrently.)
+        self._lock = threading.RLock()
+
         # BM25 corpus statistics (updated as documents are indexed)
         self._vocab: dict[str, int] = {}       # token → vocab index
         self._doc_freqs: dict[str, int] = {}   # token → # docs containing it
@@ -150,10 +155,12 @@ class Embedder:
 
     @property
     def avg_doc_len(self) -> float:
-        return self._total_tokens / max(self._doc_count, 1)
+        with self._lock:
+            return self._total_tokens / max(self._doc_count, 1)
 
     def _register_document(self, tokens: list[str]) -> None:
         """Update vocabulary and BM25 statistics for a new document."""
+        # Caller must hold self._lock.
         self._doc_count += 1
         self._total_tokens += len(tokens)
         seen_in_doc: set[str] = set()
@@ -167,6 +174,7 @@ class Embedder:
 
     def _register_query_tokens(self, tokens: list[str]) -> None:
         """Add new query tokens to vocab without affecting BM25 statistics."""
+        # Caller must hold self._lock.
         for token in tokens:
             if token not in self._vocab:
                 self._vocab[token] = self._next_vocab_id
@@ -181,44 +189,51 @@ class Embedder:
 
         Keys: chunk_id, dense_vector, sparse_indices, sparse_values, payload
         """
-        # First pass: update BM25 corpus statistics from all chunks
-        chunk_tokens: list[list[str]] = []
-        for chunk in chunks:
-            tokens = _tokenize(chunk.text)
-            chunk_tokens.append(tokens)
-            self._register_document(tokens)
+        # Tokenize locally (no shared state)
+        chunk_tokens: list[list[str]] = [_tokenize(c.text) for c in chunks]
 
-        # Second pass: dense embeddings (batched)
+        # Dense embeddings can run outside the stats lock.
         texts = [c.text for c in chunks]
         dense_matrix = self._embed_texts_batched(texts)
 
-        results = []
-        for i, chunk in enumerate(chunks):
-            sparse_i, sparse_v = _bm25_sparse_vector(
-                chunk_tokens[i],
-                self._vocab,
-                self._doc_freqs,
-                self._doc_count,
-                self.avg_doc_len,
-            )
-            payload = {
-                "file_id": chunk.file_id,
-                "chunk_id": chunk.chunk_id,
-                "text": chunk.text,
-                "chunk_level": chunk.level,
-                "chunk_index": chunk.chunk_index,
-                "parent_id": chunk.parent_id,
-                **chunk.metadata,
-            }
-            results.append({
-                "chunk_id": chunk.chunk_id,
-                "dense_vector": dense_matrix[i].tolist(),
-                "sparse_indices": sparse_i,
-                "sparse_values": sparse_v,
-                "payload": payload,
-            })
-        self._save_stats()
-        return results
+        with self._lock:
+            # Update BM25 corpus statistics from all chunks
+            for tokens in chunk_tokens:
+                self._register_document(tokens)
+
+            results = []
+            avg_dl = self.avg_doc_len
+            doc_count = self._doc_count
+            vocab = self._vocab
+            doc_freqs = self._doc_freqs
+
+            for i, chunk in enumerate(chunks):
+                sparse_i, sparse_v = _bm25_sparse_vector(
+                    chunk_tokens[i],
+                    vocab,
+                    doc_freqs,
+                    doc_count,
+                    avg_dl,
+                )
+                payload = {
+                    "file_id": chunk.file_id,
+                    "chunk_id": chunk.chunk_id,
+                    "text": chunk.text,
+                    "chunk_level": chunk.level,
+                    "chunk_index": chunk.chunk_index,
+                    "parent_id": chunk.parent_id,
+                    **chunk.metadata,
+                }
+                results.append({
+                    "chunk_id": chunk.chunk_id,
+                    "dense_vector": dense_matrix[i].tolist(),
+                    "sparse_indices": sparse_i,
+                    "sparse_values": sparse_v,
+                    "payload": payload,
+                })
+
+            self._save_stats()
+            return results
 
     def embed_query(self, query: str) -> tuple[list[float], list[int], list[float]]:
         """Embed a single query text.
@@ -229,10 +244,11 @@ class Embedder:
             if cached is not None:
                 # Sparse is cheap to recompute
                 tokens = _tokenize(query)
-                si, sv = _bm25_sparse_vector(
-                    tokens, self._vocab, self._doc_freqs,
-                    self._doc_count, self.avg_doc_len,
-                )
+                with self._lock:
+                    si, sv = _bm25_sparse_vector(
+                        tokens, self._vocab, self._doc_freqs,
+                        self._doc_count, self.avg_doc_len,
+                    )
                 return cached, si, sv
 
         dense = self._backend.encode_single(query)
@@ -240,11 +256,12 @@ class Embedder:
             self._cache.set_embedding(query, dense)
 
         tokens = _tokenize(query)
-        self._register_query_tokens(tokens)
-        si, sv = _bm25_sparse_vector(
-            tokens, self._vocab, self._doc_freqs,
-            self._doc_count, self.avg_doc_len,
-        )
+        with self._lock:
+            self._register_query_tokens(tokens)
+            si, sv = _bm25_sparse_vector(
+                tokens, self._vocab, self._doc_freqs,
+                self._doc_count, self.avg_doc_len,
+            )
         return dense, si, sv
 
     # ------------------------------------------------------------------ #

@@ -6,6 +6,7 @@ Kept separate from LLMBackend because embeddings are always loaded
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Sequence
 
 import numpy as np
@@ -21,6 +22,7 @@ class EmbeddingBackend:
     def __init__(self) -> None:
         self._model = None
         self._model_name = ""
+        self._lock = threading.Lock()
 
     def load(self, model_name: str = "all-MiniLM-L6-v2", device: str = "cpu") -> None:
         try:
@@ -45,13 +47,14 @@ class EmbeddingBackend:
         """Return shape (N, 384) float32 array."""
         if self._model is None:
             raise RuntimeError("EmbeddingBackend not loaded. Call load() first.")
-        return self._model.encode(
-            list(texts),
-            batch_size=batch_size,
-            normalize_embeddings=normalize,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-        )
+        with self._lock:
+            return self._model.encode(
+                list(texts),
+                batch_size=batch_size,
+                normalize_embeddings=normalize,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+            )
 
     def encode_single(self, text: str, normalize: bool = True) -> list[float]:
         vec = self.encode([text], normalize=normalize)
